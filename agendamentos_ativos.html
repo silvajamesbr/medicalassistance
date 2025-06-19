@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agendamento de Consultas</title>
+  <link rel="stylesheet" href="cadastros.css">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
+</head>
+<body>
+
+  <div id="alerta" class="alerta oculto"></div>
+
+  <div class="sidebar">
+    <div class="menu-icon">&#9776;</div>
+    <ul>
+      <li><a href="agendamento.html">Agendamentos</a></li>
+      <li><a href="cadastros.html">Cadastros</a></li>
+      <li><a href="agendamentos_ativos.html">Registro de Agendamentos</a></li>
+      <li><a href="historico.html">Histórico de Pacientes</a></li>
+      <li><a href="#">Exames</a></li>
+      <li><a href="cadastro_horarios.html">Disponibilidade de Horários</a></li>
+    </ul>
+    <i class="fas fa-user"></i> Administrador<br />
+    <a href="index.html"><i class="fas fa-sign-out-alt"></i></a> Logout<br />
+  </div>
+
+  <div class="container">
+    <h1>
+      <img src="Design_Medical_Assistance02.png" alt="Medical Assistance Logo" class="logo">
+    </h1>
+
+    <div class="form">
+      <h2>Agendamentos Ativos</h2>
+
+      <ul id="lista-consultas"></ul>
+    </div>
+  </div>
+
+  <script type="module">
+    const supabaseUrl = 'https://jtazctpzzbfszxttiolz.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0YXpjdHB6emJmc3p4dHRpb2x6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAwMjYwODIsImV4cCI6MjA2NTYwMjA4Mn0.LT2LQgJe_Xl8beCb7vgAgRVmnmGmhqnHMvxeJq9ab1o';
+  
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js';
+  
+    const supabase = createClient(supabaseUrl, supabaseKey);
+  
+    function dataHoraToDate(data, hora) {
+      // Junta "2025-06-19" + "09:45" => new Date("2025-06-19T09:45:00")
+      return new Date(`${data}T${hora}:00`);
+    }
+  
+    async function carregarConsultas() {
+      const agora = new Date();
+  
+      const { data: agendamentos, error: errAgendamentos } = await supabase
+        .from('agendamentos')
+        .select('*')
+        .order('data', { ascending: true });
+  
+      const { data: pacientes, error: errPacientes } = await supabase
+        .from('paciente')
+        .select('id, nome');
+  
+      const { data: funcionarios, error: errFuncionarios } = await supabase
+        .from('funcionarios')
+        .select('id, nome_completo');
+  
+      if (errAgendamentos || errPacientes || errFuncionarios) {
+        console.error('Erro ao buscar dados:', errAgendamentos || errPacientes || errFuncionarios);
+        return;
+      }
+  
+      const mapaPacientes = {};
+      pacientes.forEach(p => mapaPacientes[p.id] = p.nome);
+  
+      const mapaFuncionarios = {};
+      funcionarios.forEach(f => mapaFuncionarios[f.id] = f.nome_completo);
+  
+      const lista = document.getElementById('lista-consultas');
+      lista.innerHTML = '';
+  
+      agendamentos.forEach(item => {
+        const dataHora = dataHoraToDate(item.data, item.horario);
+        if (dataHora <= agora) return; // Ignora agendamentos passados
+  
+        const nomePaciente = mapaPacientes[item.paciente] || 'Paciente não encontrado';
+        const nomeProfissional = mapaFuncionarios[item.profissional] || 'Profissional não encontrado';
+  
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <strong>Data:</strong> ${item.data} ${item.horario}<br>
+          <strong>Especialidade:</strong> ${item.especialidade}<br>
+          <strong>Paciente:</strong> ${nomePaciente}<br>
+          <strong>Profissional:</strong> ${nomeProfissional}<br>
+          <button class="excluir-btn" data-id="${item.id}">Excluir</button>
+        `;
+        lista.appendChild(li);
+      });
+  
+      // Ativar botões de exclusão
+      document.querySelectorAll('.excluir-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-id');
+          const confirmacao = confirm('Tem certeza que deseja excluir este agendamento?');
+          if (!confirmacao) return;
+  
+          const { error } = await supabase
+            .from('agendamentos')
+            .delete()
+            .eq('id', id);
+  
+          if (error) {
+            alert('Erro ao excluir agendamento.');
+            console.error(error);
+          } else {
+            alert('Agendamento excluído com sucesso!');
+            carregarConsultas(); // Recarrega lista
+          }
+        });
+      });
+    }
+  
+    carregarConsultas();
+  </script>
+  
+</body>
+</html>
